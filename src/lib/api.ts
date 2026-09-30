@@ -1,12 +1,13 @@
-import { loadSession, isAccessTokenStale } from './session.js';
+import { CredentialsError, resolveBearer } from './credentials.js';
 
 /**
  * Thin Bearer-auth API helper for CLI commands.
  *
- * Token resolution order:
- *   1. `SUPPUO_TOKEN` env (explicit override, CI-friendly)
- *   2. the Huudis access token stored by `auth login`
- *      (~/.suppuo/session.json) — used as Bearer against suppuo.com.
+ * Token resolution order (lib/credentials.ts):
+ *   1. `SUPPUO_TOKEN` env (explicit override, CI-friendly — an sk_live_… API key)
+ *   2. the API key saved by `suppuo auth login --api-key <key>`
+ *   3. the Huudis session saved by `suppuo auth login` (~/.suppuo/session.json),
+ *      refreshed when it is about to expire.
  *
  * Unwraps the Forjio `{ data, error, meta }` envelope and throws
  * `CliApiError` carrying the envelope's `error.code`.
@@ -30,25 +31,22 @@ export function baseUrl(): string {
   return (process.env.SUPPUO_BASE_URL ?? 'https://suppuo.com').replace(/\/+$/, '');
 }
 
-export function resolveToken(): string {
-  const envToken = process.env.SUPPUO_TOKEN;
-  if (envToken) return envToken;
-  const session = loadSession();
-  if (!session) {
+export async function resolveToken(): Promise<string> {
+  let resolved;
+  try {
+    resolved = await resolveBearer();
+  } catch (e) {
+    if (e instanceof CredentialsError) throw new CliApiError(0, e.code, e.message);
+    throw e;
+  }
+  if (!resolved) {
     throw new CliApiError(
       0,
       'AUTH_REQUIRED',
-      'Not signed in. Run `suppuo auth login` or set SUPPUO_TOKEN.',
+      'Not signed in. Run `suppuo auth login` (or `suppuo auth login --api-key <key>`), or set SUPPUO_TOKEN.',
     );
   }
-  if (isAccessTokenStale(session)) {
-    throw new CliApiError(
-      0,
-      'TOKEN_EXPIRED',
-      'Session expired. Run `suppuo auth login` again (or set SUPPUO_TOKEN).',
-    );
-  }
-  return session.accessToken;
+  return resolved.token;
 }
 
 interface Envelope<T> {
@@ -57,12 +55,14 @@ interface Envelope<T> {
   meta?: { requestId: string };
 }
 
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
 export async function apiRequest<T>(
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  method: HttpMethod,
   path: string,
   opts: { body?: unknown; query?: Record<string, string | number | undefined> } = {},
 ): Promise<T> {
-  const token = resolveToken();
+  const token = await resolveToken();
   const url = new URL(baseUrl() + path);
   for (const [k, v] of Object.entries(opts.query ?? {})) {
     if (v !== undefined) url.searchParams.set(k, String(v));
