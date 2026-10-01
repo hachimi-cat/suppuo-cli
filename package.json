@@ -1,6 +1,6 @@
 {
   "name": "@forjio/suppuo-cli",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "CLI for Suppuo (part of the Forjio commerce suite).",
   "type": "module",
   "main": "dist/index.js",
