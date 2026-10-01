@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+- `suppuo api webhook-subscriptions deliveries` (`--subscription-id`, `--status`, `--type`, `--limit`, `--cursor`), `get-deliveries <id>`, `deliveries-retry <id>` and `event-types`: the webhook delivery log, with every attempt, and a retry.
+- `suppuo api webhook-subscriptions update <id>` takes `--url` and `--events` too (it only took `--active`).
+
 ## 0.3.0
 - A route read by id next to its list is named `get` + the list's name: `suppuo api help get-articles` (was `suppuo api help articles-2`), `suppuo api requester get-tickets` (was `suppuo api requester tickets-2`). Each old name still works, hidden from help.
 
